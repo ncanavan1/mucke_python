@@ -79,8 +79,38 @@ def contact(message):
             print("###################################")
             print("########## READY FOR KDF ##########")
 
+            final_key = KDF(ck,qk,m0,response[0],psk,secState,0)
+            print("Final Key: ", final_key)
+
+
             conn.close()
 
+
+## the || operator in the muckle document means concatinate
+## using hashes instead of normal prf as message cannot be put into int
+def KDF(ck,qk,m0,m1,psk,secState,ctr):
+
+    h0 = hmac.HMAC(str(qk).encode(),hashes.SHA256())
+    concat_m = m0 + m1
+    h0.update(concat_m)
+    k0 = h0.finalize()
+
+
+    h1 = hmac.HMAC(str(qk).encode(),hashes.SHA256())
+    h1.update(k0)
+    k1 = h1.finalize()
+
+    h2 = hmac.HMAC(str(psk).encode(),hashes.SHA256())
+    h2.update(k1)
+    k2 = h2.finalize()
+
+    concat_m_c = m0 + m1 + bytes(ctr)
+    h3 = hmac.HMAC(k2,hashes.SHA256())
+    h3.update(concat_m_c)
+    k3 = h3.finalize()
+    
+    ###Need to figure out the state update, where this variable comes from.
+    return k3
 
 
 def get_final_key(key,label):
