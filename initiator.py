@@ -51,20 +51,41 @@ def contact(message):
             print("Finished recieving m1, tau1")
             response = pickle.loads(b"".join(data))
 
-            m1 = response[0]
+            m1 = pickle.loads(response[0])
+            headerB = m1[0]
+            quantum_k_cipher = m1[1]
+            classic_k_cipher = m1[2]
             tau1 = response[1]
-            label_b = 100002 ##must be changed to when this is determined.
+            label_b = headerB[2] 
             mkeyB = get_mKey(psk,secState,label_b)
 
-            if(verifyMAC(tau1,mkeyB,m1) == 1):
+            if(verifyMAC(tau1,mkeyB,response[0]) == 1): ##response[0] is pickled m1
            # s.sendall("Verifcation Success".encode())
                 print("Verifcation Success")
             else:
          #   s.sendall("Verification Failure".encode())
                 print("Verifcation Failure")
 
-           # classical_sym_key = classical_decaps(classic_cipher_B, private_key_classic)
+            
+            classic_key_plain = classical_decaps(classic_k_cipher, private_key_classic)
+            quantum_key_plain = quantum_decaps(quantum_k_cipher,private_key_quant)
+
+            ck = get_final_key(classic_key_plain,512)
+            qk = get_final_key(int.from_bytes(quantum_key_plain),8192128)
+
+            print("Classical key: ", ck)
+            print("Quantum key: ", qk)
+
+            print("###################################")
+            print("########## READY FOR KDF ##########")
+
             conn.close()
+
+
+
+def get_final_key(key,label):
+    return PRF(key,label)
+
 
 
 def verifyMAC(code,key,message):
@@ -78,6 +99,10 @@ def verifyMAC(code,key,message):
         return 1
     else:
         return 0
+    
+def quantum_decaps(cipher, private_key):
+    key = decrypt(private_key,cipher)
+    return key
 
 def classical_decaps(cipher, private_key):
     private_key = serialization.load_pem_private_key(private_key,password=None)
@@ -85,7 +110,8 @@ def classical_decaps(cipher, private_key):
         mgf=padding.MGF1(algorithm=hashes.SHA256()),
         algorithm=hashes.SHA256(),
         label=None))
-    return key
+    
+    return int(key.decode())
 
 #################################################
 ####### Inititator Phase, KeyGen ################
@@ -173,17 +199,6 @@ if __name__ == '__main__':
     contact(inital_message)
 
 
-    ##verify hmac##
-"""
-    h = hmac.HMAC(str(mKeyA).encode(),hashes.SHA256())
-    h.update(m0)
-    h_copy = h.copy()
-    vsig = h.verify(tau0)
-    if(tau0.__eq__(vsig)):
-        print("Verification passed")
-    else:
-        print("Verification failed")
-"""
 
     
     

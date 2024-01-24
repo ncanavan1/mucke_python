@@ -64,24 +64,22 @@ def ASE_keyGen():
 
 def KEM_classic(public_key,encryption):
     cipher_k = 0
+    k = 0
     if encryption.__eq__("rsa512"):
         k = ASE_keyGen()
-        print(k)
         cipher_k = public_key.encrypt(k,padding.OAEP(
         mgf=padding.MGF1(algorithm=hashes.SHA256()),
         algorithm=hashes.SHA256(),
         label=None))
-    return cipher_k
+    return cipher_k, int(k.decode())
 
 
 def KEM_quantum(public_key,encryption):
     cipher_k = 0
     if encryption.__eq__("mceliece8192128"):
-        k = ASE_keyGen()
         cipher_k, plain_k = encrypt(public_key)
-      #  print("Quantum key plain: ", plain_k)
-      #  print("Quantum key cipher: ", cipher_k)
-    return cipher_k
+       # plain_k = plain_k.decode(encoding="ISO-8859-1") ##strange encoding due to how pqcrypto generates plaintext
+    return cipher_k, plain_k
 
 def gen_m(header,qpk,cpk):
     message = [header, qpk, cpk]
@@ -98,6 +96,16 @@ def gen_MAC(key,message):
     h.update(message)
     signature = h.finalize()
     return signature
+
+
+##takes as input a key and "label_ck / label_qk" idk where these labels are found
+##unsure about why this step needs to be done. Is it prehaps to have a key that is in 
+##a homogenous format for q&c?
+##currently going to use name of encryption scheme as label
+def get_final_key(key,label):
+    return PRF(key,label)
+
+
 
 def contact():
 
@@ -144,12 +152,12 @@ def contact():
         public_key_quantum_A = m0[1]
         public_key_classic_A = serialization.load_pem_public_key(m0[2])
 
-        classic_k_cipher = KEM_classic(public_key_classic_A,version[0])
-        quantum_k_cipher = KEM_quantum(public_key_quantum_A,version[1])
+        classic_k_cipher, classic_k_plain = KEM_classic(public_key_classic_A,version[0])
+        quantum_k_cipher, quantum_k_plain = KEM_quantum(public_key_quantum_A,version[1])
         print("Sending m1, tau1")
 
         role = "responder"
-        version = ["rsa512,mceliece8192128"]
+        version = ["rsa512","mceliece8192128"]
         label_b = 100002
         headerB = [role,version,label_b]
 
@@ -161,6 +169,17 @@ def contact():
 
         s.sendall(response)
         print("Finished sending m1, tau1")
+
+
+        ##label value is being filled in arbitrarily with key size
+        ck = get_final_key(classic_k_plain,512)
+        qk = get_final_key(int.from_bytes(quantum_k_plain),8192128)
+
+        print("Classical key: ", ck)
+        print("Quantum key: ", qk)
+
+        print("###################################")
+        print("########## READY FOR KDF ##########")
 
         s.close()
 
