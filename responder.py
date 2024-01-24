@@ -79,12 +79,25 @@ def KEM_quantum(public_key,encryption):
     if encryption.__eq__("mceliece8192128"):
         k = ASE_keyGen()
         cipher_k, plain_k = encrypt(public_key)
-        print("Quantum key plain: ", plain_k)
-        print("Quantum key cipher: ", cipher_k)
+      #  print("Quantum key plain: ", plain_k)
+      #  print("Quantum key cipher: ", cipher_k)
     return cipher_k
 
+def gen_m(header,qpk,cpk):
+    message = [header, qpk, cpk]
+    message_serial = pickle.dumps(message)
+    return message_serial
 
 
+def mKey(psk,secState,label):
+    mA = PRF(PRF(psk,secState),label)
+    return mA
+
+def gen_MAC(key,message):
+    h = hmac.HMAC(str(key).encode(),hashes.SHA256())
+    h.update(message)
+    signature = h.finalize()
+    return signature
 
 def contact():
 
@@ -135,8 +148,16 @@ def contact():
         quantum_k_cipher = KEM_quantum(public_key_quantum_A,version[1])
         print("Sending m1, tau1")
 
-        response = classic_k_cipher
-        response = pickle.dumps(response)
+        role = "responder"
+        version = ["rsa512,mceliece8192128"]
+        label_b = 100002
+        headerB = [role,version,label_b]
+
+        m1 = gen_m(headerB,quantum_k_cipher,classic_k_cipher)
+        mKeyB = mKey(psk,secState,label_b)
+        tau1 = gen_MAC(mKeyB,m1)
+        print("MAC: ", tau1)
+        response = pickle.dumps([m1,tau1])
 
         s.sendall(response)
         print("Finished sending m1, tau1")

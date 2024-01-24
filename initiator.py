@@ -49,12 +49,35 @@ def contact(message):
                 if len(packet) <=0: break
                 data.append(packet)
             print("Finished recieving m1, tau1")
-            classic_cipher_B = pickle.loads(b"".join(data))
-            
-            classical_sym_key = classical_decaps(classic_cipher_B, private_key_classic)
-            print(classical_sym_key)
+            response = pickle.loads(b"".join(data))
+
+            m1 = response[0]
+            tau1 = response[1]
+            label_b = 100002 ##must be changed to when this is determined.
+            mkeyB = get_mKey(psk,secState,label_b)
+
+            if(verifyMAC(tau1,mkeyB,m1) == 1):
+           # s.sendall("Verifcation Success".encode())
+                print("Verifcation Success")
+            else:
+         #   s.sendall("Verification Failure".encode())
+                print("Verifcation Failure")
+
+           # classical_sym_key = classical_decaps(classic_cipher_B, private_key_classic)
             conn.close()
 
+
+def verifyMAC(code,key,message):
+
+    h = hmac.HMAC(str(key).encode(),hashes.SHA256())
+    h.update(message)
+   # h_copy = h.copy()
+    #vsig = h.verify(code)
+    vsig = h.finalize()
+    if(code.__eq__(vsig)):
+        return 1
+    else:
+        return 0
 
 def classical_decaps(cipher, private_key):
     private_key = serialization.load_pem_private_key(private_key,password=None)
@@ -105,7 +128,7 @@ def get_SecState():
     return secState
 
 
-def mKey(psk,secState,label):
+def get_mKey(psk,secState,label):
     mA = PRF(PRF(psk,secState),label)
     return mA
 
@@ -141,7 +164,7 @@ if __name__ == '__main__':
     m0 = gen_m0(headerA,public_key_quant,public_key_classic)
   
     ##Authentication section##
-    mKeyA = mKey(psk,secState,label_a)
+    mKeyA = get_mKey(psk,secState,label_a)
     tau0 = gen_MAC(mKeyA,m0)
 
     print(tau0)
